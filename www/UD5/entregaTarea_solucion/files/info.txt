@@ -1,0 +1,2 @@
+carpeta para subir archivos adjuntos de las tareas
+Sobre esta carpeta debe tener permisos el usuario del contenedor www (www-data) -> sudo chown -R ladmin:www-data files/
