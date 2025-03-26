@@ -93,7 +93,7 @@
                                 <a href="https://manuais.pages.iessanclemente.net/plantillas/daw/dwcs-d/ud05/8.anexos/8.interface/index.html" target="_blank">Boletín 8. Interfaces</a><br />
                                 <a href="https://manuais.pages.iessanclemente.net/plantillas/daw/dwcs-d/ud05/8.anexos/9.traits/index.html" target="_blank">Boletín 9. Traits</a><br />
                                 <a href="https://manuais.pages.iessanclemente.net/plantillas/daw/dwcs-d/ud05/8.anexos/10.excepciones/index.html" target="_blank">Boletín 10. Excepciones</a><br />
-
+                                <a href="https://manuais.pages.iessanclemente.net/plantillas/daw/dwcs-d/ud05/9.tarea_ud05/index.html">Tarea</a>
                             </td>
                             <td>
                                 <a href="UD5" target="_blank">Ejemplos unidad</a><br />
@@ -107,9 +107,23 @@
                                 <a href="UD5/anexos/8.interface.php" target="_blank">Solución boletín 8</a><br />
                                 <a href="UD5/anexos/9.traits.php" target="_blank">Solución boletín 9</a><br />
                                 <a href="UD5/anexos/10.excepciones.php" target="_blank">Solución boletín 10</a><br />
-                                
+                                <a href="UD5/entregaTarea_solucion" target="_blank">Solución Tarea</a><br />
                             </td>
-                        </tr> 
+                        </tr>
+                        <tr>
+                            <td><a href="https://manuais.pages.iessanclemente.net/plantillas/daw/dwcs-d/ud06/index.html" target="_blank">Unidad 6</a></td>
+                            <td>
+                                <br />
+                                <a href="https://manuais.pages.iessanclemente.net/plantillas/daw/dwcs-d/ud06/4.anexos/1.flight/index.html" target="_blank">Boletín 1. Flight</a><br />
+                                <!--a href="https://manuais.pages.iessanclemente.net/plantillas/daw/dwcs-d/ud05/5.tarea_ud05/index.html">Tarea</a-->
+                            </td>
+                            <td>
+                                <a href="UD6" target="_blank">Ejemplos unidad</a><br />
+                                <a href="UD6/anexos/1.flight.php" target="_blank">Solución boletín 1</a><br />
+                                
+                                <!--a href="UD6/entregaTarea_solucion" target="_blank">Solución Tarea</a><br /-->
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
