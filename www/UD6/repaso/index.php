@@ -153,4 +153,103 @@ Flight::route('POST /register', function() {
     }
  });
 
+/**
+ * Listar contactos (/contactos): devuelve todos los contactos del usuario autenticado. 
+ * Además, opcionalmente, tendrá que devolver solo un contacto obtenido a partir de su ID,
+ * teniendo en cuenta que debe pertenecer al usuario autenticado.
+ */
+Flight::route('GET /contactos(/@id_contacto)', function ($id_contacto = null) {
+    try {
+        // Recoger de la cabecera de la petición HTTP el token 'X-Token'
+        $token = Flight::request()->getHeader('X-Token');
+        
+        // Devolver un error en caso de que no se envíe el token en la cabecera
+        if (!$token) {
+            Flight::json(['error' => 'Falta el token de autenticación en la cabecera de la HTTP request.', 401]);
+            return;
+        }
+
+        // Comprobar que el token de autenticación existe en la base de datos
+        $sql = "SELECT id FROM usuarios WHERE token = :token";
+
+        // Preparar la consulta
+        $stmt = Flight::db()->prepare($sql);
+
+        // Vincular parámetros
+        $stmt->bindParam(':token', $token);
+
+        // Ejecutar la consulta
+        $stmt->execute();
+
+        // Recoger el resultado
+        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // En caso de que no exista el token, devolver un mensaje de error
+        if(!$usuario){
+            Flight::json(['error' => 'El token no es válido.'], 401); // Status code 401 "Unauthorized"
+            return;
+        }
+
+        // Obtener contacto por su id
+        if ($id_contacto){
+
+            // Sentencia SQL para obtener un contacto por su id
+            $sql = "SELECT * FROM contactos WHERE usuario_id = :usuario_id AND id = :id";
+
+            // Prepararo la sentecia
+            $stmt = Flight::db()->prepare($sql);
+
+            // Vinculo parámetros
+            $stmt->bindParam(':usuario_id', $usuario['id']);
+            $stmt->bindParam(':id', $id_contacto);
+
+            // Ejecuto la sentencia
+            $stmt->execute();
+
+            // Resultados
+            $contactos = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // Respuesta JSON. No se encontró contacto
+            if (!$contactos) {
+                Flight::json(['error' => 'No se encontró el contacto'], 404); // Status Code 404 "Not Found"
+            } else {
+                // Respuesta JSON. Se encontró el contacto
+                Flight::json([
+                    'success' => 'Contacto encontrado',
+                    'contactos' => $contactos
+                ], 200); // Status Code 200 "Ok".
+            }
+        } else {
+            // Sentencia SQL para obtener TODOS los contactos del usuario autenticado
+            $sql = "SELECT * FROM contactos WHERE usuario_id = :usuario_id";
+
+            // Preparo la sentencia
+            $stmt = Flight::db()->prepare($sql);
+
+            // Vincular parámetros
+            $stmt->bindParam(':usuario_id', $usuario['id']);
+
+            // Ejecuto consulta
+            $stmt->execute();
+
+            // Recojo el resultado
+            $contactos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Respuesta JSON. No se encuentró contacto
+            if(!$contactos) {
+                Flight::json(['error' => 'No se encontró el contacto'], 404); // Status Code 404 "Not Found"
+            } else {
+                // Respuesta JSON. Se encontró el contacto
+                Flight::json([
+                    'success' => 'Contacto encontrado',
+                    'contactos' => $contactos
+                ], 200); // Status Code 200 "Ok".
+            }
+        }
+
+    } catch (PDOException $e) {
+        return Flight::json(['error' => $e->getMessage()], 500); // Status code 500 "Internal server error".
+    }
+});
+   
 Flight::start();
