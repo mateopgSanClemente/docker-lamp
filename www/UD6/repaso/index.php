@@ -9,6 +9,9 @@ Flight::route('/', function () {
     echo 'hello world!';
 });
 
+// ------ Middlewares ------
+require_once 'middlewares/middlewares.php';
+
 // ------ Registrar instancia PDO ------
 /*
  * Registramos el servicio 'db' en Flight:
@@ -29,43 +32,44 @@ Flight::register('db', 'PDO', array('mysql:host=db;dbname=agenda', 'root', 'test
  */
 Flight::route('POST /register', function() {
     try {
-        // Recoger datos del body la solicitud HTTP
-        $nombre = Flight::request()->data->nombre;
-        $email = Flight::request()->data->email;
-        $password = Flight::request()->data->password;
+        // 1. Aplicar el middleware para la validación de datos de registro
+        validarUsuario();
 
-        //Validación básica
-        if(empty($nombre) || empty($email) || empty($password)){
-            Flight::json(['error' => 'Faltan campos obligatorios.'], 400); // Status code 400 "Bad Request": El servidor no puede procesar la solicitud debido a un error del cliente <https://developer.mozilla.org/es/docs/Web/HTTP/Reference/Status/400> 
-            return;
-        }
+        // 2. Recojo los datos validados para el registro de usuario. Están guardados en Flight
+        $usuarioDatosRegistro = Flight::get('usuarioDatosRegistro');
 
-        // La contraseña debe encriptarse anter de ser guardada en la base de datos. Utiliza el algoritmo bcrypt para generar el hash.
-        $passwordHash = password_hash($password, PASSWORD_BCRYPT);
-
-        // Sentencia SQL
+        // 3. Sentencia SQL
         $sql = "INSERT INTO usuarios(nombre, email, password) VALUES (:nombre, :email, :password);";
 
-        // Preparar sentencia SQL
+        // 4. Preparar sentencia SQL
         $stmt = Flight::db()->prepare($sql);
 
-        // Enlazar parámetros a la sentenia (bind params)
-        $stmt->bindParam(':nombre', $nombre);
-        $stmt->bindParam(':email', $email);
-        $stmt->bindParam(':password', $passwordHash);
+        // 5. Enlazar parámetros a la sentencia (bind params)
+        $stmt->bindParam(':nombre', $usuarioDatosRegistro['nombre']);
+        $stmt->bindParam(':email', $usuarioDatosRegistro['email']);
+        $stmt->bindParam(':password', $usuarioDatosRegistro['password']);
 
-        // Ejecutar las sentencia
+        // 6. Ejecutar las sentencia
         $stmt->execute();
 
-        // Mensajes de error o éxito en formarto JSON
-        Flight::json(['success' => 'Usuario registrado correctamente.'], 201); // Status code 201 "Created": La solitudad ha tenido exito y se ha creado un recurso. <https://developer.mozilla.org/es/docs/Web/HTTP/Reference/Status/201>
+        // 7. Mensajes de error o éxito en formarto JSON
+        Flight::json([
+            'success' => true,
+            'message' => 'Usuario registrado correctamente.'
+        ], 201); // Status code 201 "Created": La solitudad ha tenido exito y se ha creado un recurso. <https://developer.mozilla.org/es/docs/Web/HTTP/Reference/Status/201>
     } catch (PDOException $e) {
         // Error específico, el usuario no se puede registrar con un email que ya se encuentra en la base de datos. (clave única).
         if ($e->getCode() === 23000) {
-            Flight::json(['error' => 'El email ya está registrado'], 409); // Status code 409 "Conflict": <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/409>
+            Flight::json([
+                'success' => false,
+                'error'   => 'El email ya está registrado'
+            ], 409); // Status code 409 "Conflict": <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/409>
         } else {
             // Otros errores
-            Flight::json(['error' => 'Error al registrar el usuario.'], 500); // Status code 500 "Internal server error": Se dió una circunstancia inesperada que hace que el servidor sea incapaz de procesar la solicitud. <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/500>
+            Flight::json([
+                'success' => false,
+                'error'   => 'Error al registrar el usuario.'
+            ], 500); // Status code 500 "Internal server error": Se dió una circunstancia inesperada que hace que el servidor sea incapaz de procesar la solicitud. <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/500>
         }
     }
 });
