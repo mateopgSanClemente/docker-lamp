@@ -36,5 +36,5 @@ function validarUsuario () {
         'nombre' => $nombre,
         'email' => $email,
         'password' => $passwordHash
-    ])
+    ]);
 }
