@@ -75,52 +75,19 @@ Flight::route('POST /register', function() {
 });
 
 /* ------ Login ------*/
-/** Login (/login): recibe email y password, verifica las credenciales.
+/** Login (/login): recibe email y password, verifica las credenciales mediante middleware.
  *  Si son correctas, genera y devuelve un token simple. Si no, devuelve el error correspondiente.
  */
 
- Flight::route ('POST /login', function () {
+Flight::route ('POST /login', function () {
     try {
-        // Recoger variables del body de la solicitud HTTP. Recoger email y password
-        $email = Flight::request()->data->email; // También podría usar el operador ?? 'Null coalescing' para la validar. Qué metodo es mejor?
-        $password = Flight::request()->data->password;
+        // 1. Utilzar un middleware compruebe las credenciales enviadas desde la solicutd http
+        validarLogin();
 
-        //Validación básica
-        if(empty($email) || empty($password)){
-            Flight::json(['error' => 'Faltan campos obligatorios.'], 400); // Status code 400 "Bad Request": El servidor no puede procesar la solicitud debido a un error del cliente <https://developer.mozilla.org/es/docs/Web/HTTP/Reference/Status/400> 
-            return;
-        }
+        // 2. Si las credenciales son correctas, recupero el token de autenticación creado por el middleware
+        $usuario = Flight::get('usuarioToken');
 
-        // Verifico con la base de datos que las credenciales son las correctas
-        // COnsulta SQL
-        $sql = "SELECT id, nombre, email, password FROM usuarios WHERE email = :email LIMIT 1;";
-
-        // Preparamos la consulta
-        $stmt = Flight::db()->prepare($sql);
-
-        // Vinculamos parámetros (evita inyección SQL)
-        $stmt->bindParam(':email', $email);
-
-        // Ejecutamos la consulta
-        $stmt->execute();
-
-        // Recoger resultado de la consulta
-        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        // Mensaje de error en caso de que el email proporcionado por la solicitud no se corresponda con el almacenado en la base de datos.
-        if (!$usuario) {
-            Flight::json(['error' => "El email no está registrado en la base de datos."], 404); // Status code 404 "Not Found": El servidor no pudo encontrar el email en la base de datos. <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/404>
-            return;
-        }
-
-        // Comprobar que la contraseña coincide con la base de datos
-        if (!password_verify($password, $usuario['password'])){
-            Flight::json(['error' => 'La contraseña no es correcta.'], 401); // Status code 401 "Unauthorized": Las credenciales no son válidas para el recurso solicitado. <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/401>
-            return;
-        }
-
-        // En caso de que la credenciales para el login sean las correctas, se crea un token de autenticación y se guarda en la tabla 'usuarios'
-        $token = bin2hex(random_bytes(32));
+        // 3. Autentico al usuario mediante token, guardando este en la base de datos
 
         // Sentencia SQL para guardar el token
         $sql = "UPDATE usuarios SET token=:token WHERE id=:id;";
@@ -129,33 +96,22 @@ Flight::route('POST /register', function() {
         $stmt = Flight::db()->prepare($sql);
 
         // Vinculamos los parámetros. Evita inyección SQL
-        $stmt->bindParam(':token', $token);
+        $stmt->bindParam(':token', $usuario['token']);
         $stmt->bindParam(':id', $usuario['id']);
 
         // Ejecuto la sentencia
         $stmt->execute();
 
-        // Sería necesario eliminar el hash?
-        unset($usuario['password']);
-        $usuario['toke'] = $token; // Agrego la clave 'token' junto con su valor al array con los datos de usuario.
-        // Lo guardo en el array privado propio de Flight para poder usarlo más tarde. (¿No se borra al terminar el script?).
-        Flight::set('usuario', $usuario);
-
         // Mensaje de éxito
         Flight::json([
-            'success' => 'Login correcto.',
-            'token' => $token,
-            'usuario' => [
-                'id' => $usuario['id'],
-                'email' => $usuario['email'],
-                'nombre' => $usuario['nombre'] ?? null
-            ]
+            'success' => true,
+            'message' => 'Usuario logeado correctamente.'
         ], 200);
 
     } catch (PDOException $e) {
         Flight::json(['error' => $e->getMessage()], 500); // Status code 500 "Internal server error": <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/500>
     }
- });
+});
 
 /**
  * Listar contactos (/contactos): devuelve todos los contactos del usuario autenticado. 
