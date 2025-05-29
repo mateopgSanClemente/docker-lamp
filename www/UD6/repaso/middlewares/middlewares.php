@@ -98,3 +98,42 @@ function validarLogin(): void {
         'id'    => $usuario['id']
     ]);
 }
+
+function validarToken(): void {
+    // 1. Recoger de la cabecera de la petición HTTP el token 'X-Token'
+    $token = trim(Flight::request()->getHeader('X-Token'));
+    
+    // 2. Devolver un error en caso de que no se envíe el token en la cabecera
+    if (!$token) {
+        Flight::halt(401, json_encode([
+            'success' => false,
+            'error' => 'Falta el token de autenticación en la cabecera de la HTTP request.'
+        ]));
+    }
+
+    // 3. Comprobar que el token de autenticación existe en la base de datos
+    $sql = "SELECT id FROM usuarios WHERE token = :token LIMIT 1";
+
+    // Preparar la consulta
+    $stmt = Flight::db()->prepare($sql);
+
+    // Vincular parámetros
+    $stmt->bindParam(':token', $token, PDO::PARAM_STR);
+
+    // Ejecutar la consulta
+    $stmt->execute();
+
+    // 4. Recoger el resultado
+    $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // 5. En caso de que no exista el token, devolver un mensaje de error
+    if(!$usuario){
+        Flight::halt(401, json_encode([
+            'success' => false,
+            'error'   => 'El token no es válido.'
+        ])); // Status code 401 "Unauthorized"
+    }
+
+    // 6.En caso de que el usuario esté logeado, guardar el usuario en Flight
+    Flight::set('usuario', $usuario);
+}
