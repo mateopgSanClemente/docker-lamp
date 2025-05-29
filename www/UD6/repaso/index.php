@@ -128,12 +128,9 @@ Flight::route('GET /contactos(/@id_contacto)', function ($id_contacto = null) {
 
         // 2. Construir una consulta SQL dinámica según si se quiere un contacto o todos
         if ($id_contacto !== null){
-            $sql = "SELECT * FROM contactos WHERE usuario_id = :usuario_id AND id = :id LIMIT 1";
+            $sql = "SELECT * FROM contactos WHERE id = :id LIMIT 1";
             $stmt = Flight::db()->prepare($sql);
-            $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
             $stmt->bindParam(':id', $id_contacto, PDO::PARAM_INT);
-            // Resultados
-            $contactos = $stmt->fetch(PDO::FETCH_ASSOC);
 
         } else {
             $sql = "SELECT * FROM contactos WHERE usuario_id = :usuario_id";
@@ -148,19 +145,31 @@ Flight::route('GET /contactos(/@id_contacto)', function ($id_contacto = null) {
             : $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // 4. Generar respuesta HTTP. Formato JSON
+        // Generar una respuesta HTTP en caso de que el contacto al que se quiere acceder no pertenezca al usuario autenticado.
+        if (isset($contactos['usuario_id']) && $contactos['usuario_id'] != $usuario_id){
+            Flight::halt(403, json_encode([
+                'success' => false,
+                'error' => 'El contacto no pertenece al usuario.'
+            ]));
+        }
+
         if(!$contactos) {
             Flight::halt(404, json_encode([ // Status Code 404 "Not Found"
                 'success' => false,
                 'error' => 'No se encontró el contacto'
             ]));
         }  
-        
+
+        // 5. Generar respuesta HTTP
         Flight::json([
             'success' => true,
             'data' => $contactos
         ], 200); // Status Code 200 "Ok".
     } catch (PDOException $e) {
-        return Flight::json(['error' => $e->getMessage()], 500); // Status code 500 "Internal server error".
+        return Flight::json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500); // Status code 500 "Internal server error".
     }
 });
 
