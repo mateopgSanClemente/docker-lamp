@@ -178,65 +178,49 @@ Flight::route('GET /contactos(/@id_contacto)', function ($id_contacto = null) {
  */
 Flight::route ('POST /contactos', function(){
     try {
-        // Comprobar que el usuario se encuentra autenticado a través del token (X-Token) enviado en la cabecera de la soliciutd HTTP. 
-        $token = Flight::request()->getHeader('X-Token');
-        if(!$token){
-            Flight::json(['error' => 'Falta el token de autenticación de la cabecera de la solicitud HTTP.'], 401); // Status Code 401 "Unauthorized".
-            return;
-        }
+        // 1. Validar token y obtener id de usuario
+        validarToken();
+        $usuario_id = Flight::get('usuario')['id'];
 
-        // Recoger los valores necesarios para el registro del body de la solicitud HTTP.
-        $nombre = Flight::request()->data->nombre;
-        $telelfono = Flight::request()->data->telefono;
-        $email = Flight::request()->data->email;
+        // 2. Recoger, validar y sanear data para el registro de contacto de la petición HTTP.
+        validarContacto();
+        $contacto = Flight::get('contacto');
 
-        // Validar datos de la solicitud. Sería buena idea hacerlo mediante expresiones regulares
-        if (!$nombre || !$telelfono || !$email) {
-            Flight::json(['error' => 'Faltan datos de la solicitud'], 400); // Status code 400 "Bad Request".
-            return;
-        }
-
-        // Comprueba que el usuario está autenticado, para ello utilizo el token para comprobar que existe en la base de datos.
-        $sql = "SELECT id FROM usuarios WHERE token = :token";
-
-        // Preparo la consulta
-        $stmt = Flight::db()->prepare($sql);
-
-        // Vinculo parámetros
-        $stmt->bindParam(':token', $token);
-
-        // Ejecuto consulta
-        $stmt->execute();
-
-        // Defino como quiero que se me devuelvan los datos
-        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        // Si no tengo resultados el usuario no está autenticado
-        if(!$usuario) {
-            Flight::json(['error' => 'El token no es válido.'], 401); // Status Code 401 "Unauthorized".
-            return;
-        }
-
-        // Si la autenticación es correcta, procedemos a registrar el contacto en la bd
+        // 3. Si la autenticación es correcta, registrar el contacto en la bd
         $sql = "INSERT INTO contactos (nombre, telefono, email, usuario_id) VALUES (:nombre, :telefono, :email, :usuario_id)";
 
         // Preparo la consulta SQL
         $stmt = Flight::db()->prepare($sql);
         
         // Vinculo parámetros
-        $stmt->bindParam(':nombre', $nombre);
-        $stmt->bindParam(':telefono', $telelfono);
-        $stmt->bindParam(':email', $email);
-        $stmt->bindParam(':usuario_id', $usuario['id']);
+        $stmt->bindParam(':nombre', $contacto['nombre']);
+        $stmt->bindParam(':telefono', $contacto['telefono']);
+        $stmt->bindParam(':email', $contacto['email']);
+        $stmt->bindParam(':usuario_id', $usuario_id);
 
         // Ejecuto consulta
         $stmt->execute();
 
         // Devolver mensaje de confirmación
-        Flight::json(['success' => 'El contacto se guardo correctamente.'], 201); // Status code 201 "Created": indicates that the HTTP request has led to the creation of a resource.
+        Flight::json([
+            'success' => true,
+            'message' => 'El contacto se guardo correctamente.'
+        ], 201); // Status code 201 "Created": indicates that the HTTP request has led to the creation of a resource.
     } catch (PDOException $e) {
         Flight::json(['error' => $e->getMessage()], 500); // Status code 500 "Internal Server Error".
     }
 });
 
+/**
+ * Editar contacto (/contactos): permite modificar un contacto, asegurando que sea del usuario autenticado.
+ */
+Flight::route('PUT /contactos', function(){
+    try {
+
+    } catch (PDOException $e) {
+        Flight::json([
+            'success' => false,
+            'error' => $e->getMessage()], 500); // Status code 500 "Internal Server Error".
+    }
+});
 Flight::start();
