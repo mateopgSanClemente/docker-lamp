@@ -85,10 +85,9 @@ Flight::route ('POST /login', function () {
         validarLogin();
 
         // 2. Si las credenciales son correctas, recupero el token de autenticación creado por el middleware
-        $usuario = Flight::get('usuarioToken');
+        $usuario = Flight::get('usuario');
 
         // 3. Autentico al usuario mediante token, guardando este en la base de datos
-
         // Sentencia SQL para guardar el token
         $sql = "UPDATE usuarios SET token=:token WHERE id=:id;";
 
@@ -102,7 +101,7 @@ Flight::route ('POST /login', function () {
         // Ejecuto la sentencia
         $stmt->execute();
 
-        // Mensaje de éxito
+        // 4. HTTP Response
         Flight::json([
             'success' => true,
             'message' => 'Usuario logeado correctamente.'
@@ -120,93 +119,43 @@ Flight::route ('POST /login', function () {
  */
 Flight::route('GET /contactos(/@id_contacto)', function ($id_contacto = null) {
     try {
-        // Recoger de la cabecera de la petición HTTP el token 'X-Token'
-        $token = Flight::request()->getHeader('X-Token');
-        
-        // Devolver un error en caso de que no se envíe el token en la cabecera
-        if (!$token) {
-            Flight::json(['error' => 'Falta el token de autenticación en la cabecera de la HTTP request.', 401]);
-            return;
-        }
+        // 1. Middleware: Validar token y obtener usuario autenticado
+        validarToken();
+        $usuario_id = Flight::get('usuario')['id'];
 
-        // Comprobar que el token de autenticación existe en la base de datos
-        $sql = "SELECT id FROM usuarios WHERE token = :token";
-
-        // Preparar la consulta
-        $stmt = Flight::db()->prepare($sql);
-
-        // Vincular parámetros
-        $stmt->bindParam(':token', $token);
-
-        // Ejecutar la consulta
-        $stmt->execute();
-
-        // Recoger el resultado
-        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        // En caso de que no exista el token, devolver un mensaje de error
-        if(!$usuario){
-            Flight::json(['error' => 'El token no es válido.'], 401); // Status code 401 "Unauthorized"
-            return;
-        }
-
-        // Obtener contacto por su id
-        if ($id_contacto){
-
-            // Sentencia SQL para obtener un contacto por su id
-            $sql = "SELECT * FROM contactos WHERE usuario_id = :usuario_id AND id = :id";
-
-            // Prepararo la sentecia
+        // 2. Construir una consulta SQL dinámica según si se quiere un contacto o todos
+        if ($id_contacto !== null){
+            $sql = "SELECT * FROM contactos WHERE usuario_id = :usuario_id AND id = :id LIMIT 1";
             $stmt = Flight::db()->prepare($sql);
-
-            // Vinculo parámetros
-            $stmt->bindParam(':usuario_id', $usuario['id']);
-            $stmt->bindParam(':id', $id_contacto);
-
-            // Ejecuto la sentencia
-            $stmt->execute();
-
+            $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+            $stmt->bindParam(':id', $id_contacto, PDO::PARAM_INT);
             // Resultados
             $contactos = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Respuesta JSON. No se encontró contacto
-            if (!$contactos) {
-                Flight::json(['error' => 'No se encontró el contacto'], 404); // Status Code 404 "Not Found"
-            } else {
-                // Respuesta JSON. Se encontró el contacto
-                Flight::json([
-                    'success' => 'Contacto encontrado',
-                    'contactos' => $contactos
-                ], 200); // Status Code 200 "Ok".
-            }
         } else {
-            // Sentencia SQL para obtener TODOS los contactos del usuario autenticado
             $sql = "SELECT * FROM contactos WHERE usuario_id = :usuario_id";
-
-            // Preparo la sentencia
             $stmt = Flight::db()->prepare($sql);
-
-            // Vincular parámetros
-            $stmt->bindParam(':usuario_id', $usuario['id']);
-
-            // Ejecuto consulta
-            $stmt->execute();
-
-            // Recojo el resultado
-            $contactos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            // Respuesta JSON. No se encuentró contacto
-            if(!$contactos) {
-                Flight::json(['error' => 'No se encontró el contacto'], 404); // Status Code 404 "Not Found"
-            } else {
-                // Respuesta JSON. Se encontró el contacto
-                Flight::json([
-                    'success' => 'Contacto encontrado',
-                    'contactos' => $contactos
-                ], 200); // Status Code 200 "Ok".
-            }
+            $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
         }
 
+        // 3. Ejecutar consulta
+        $stmt->execute();
+        $contactos = $id_contacto !== null
+            ? $stmt->fetch(PDO::FETCH_ASSOC)
+            : $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 4. Generar respuesta HTTP. Formato JSON
+        if(!$contactos) {
+            Flight::halt(404, json_encode([ // Status Code 404 "Not Found"
+                'success' => false,
+                'error' => 'No se encontró el contacto'
+            ]));
+        }  
+        
+        Flight::json([
+            'success' => true,
+            'data' => $contactos
+        ], 200); // Status Code 200 "Ok".
     } catch (PDOException $e) {
         return Flight::json(['error' => $e->getMessage()], 500); // Status code 500 "Internal server error".
     }
@@ -217,7 +166,7 @@ Flight::route('GET /contactos(/@id_contacto)', function ($id_contacto = null) {
  */
 Flight::route ('POST /contactos', function(){
     try {
-        // Comprobar que el usuario se encuentra autenticado a través del token enviado en la cabecera de la soliciutd HTTP. X-Token
+        // Comprobar que el usuario se encuentra autenticado a través del token (X-Token) enviado en la cabecera de la soliciutd HTTP. 
         $token = Flight::request()->getHeader('X-Token');
         if(!$token){
             Flight::json(['error' => 'Falta el token de autenticación de la cabecera de la solicitud HTTP.'], 401); // Status Code 401 "Unauthorized".
@@ -229,8 +178,8 @@ Flight::route ('POST /contactos', function(){
         $telelfono = Flight::request()->data->telefono;
         $email = Flight::request()->data->email;
 
-        // Validar datos de la solicitud
-        if (empty($nombre) || empty($telelfono) || empty($email)) {
+        // Validar datos de la solicitud. Sería buena idea hacerlo mediante expresiones regulares
+        if (!$nombre || !$telelfono || !$email) {
             Flight::json(['error' => 'Faltan datos de la solicitud'], 400); // Status code 400 "Bad Request".
             return;
         }
