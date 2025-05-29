@@ -137,3 +137,35 @@ function validarToken(): void {
     // 6.En caso de que el usuario esté logeado, guardar el usuario en Flight
     Flight::set('usuario', $usuario);
 }
+
+function validarContacto() {
+    // 1. Recoger los valores necesarios para el registro del body de la solicitud HTTP.
+    $data = Flight::request()->data;
+
+    $nombre = trim($data->nombre);
+    $telefono = trim($data->telefono);
+    $email = trim($data->email);
+
+    // 2. Validar datos de la solicitud.
+    // Sería buena idea hacerlo mediante expresiones regulares, pero por simplificar lo haré de esta forma.
+    if (!$nombre || !$telefono || !$email) {
+        Flight::halt(400, json_encode([
+            'success' => false,
+            'error' => 'Faltan datos obligatorios: nombre, telefono, email.'
+        ])); // Status code 400 "Bad Request".
+    }
+    
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)){
+        Flight::halt(400, json_encode([
+            'success' => false,
+            'error' => 'El formato de email no es valido.'
+        ]));
+    }
+
+    // 3. Si los datos son correctos, los guardo en Flight
+    Flight::set('contacto', [
+        'nombre' => $nombre,
+        'telefono' => $telefono,
+        'email' => $email
+    ]);
+}
