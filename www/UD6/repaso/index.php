@@ -108,7 +108,10 @@ Flight::route ('POST /login', function () {
         ], 200);
 
     } catch (PDOException $e) {
-        Flight::json(['error' => $e->getMessage()], 500); // Status code 500 "Internal server error": <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/500>
+        Flight::json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500); // Status code 500 "Internal server error": <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/500>
     }
 });
 
