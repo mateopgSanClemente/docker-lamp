@@ -120,17 +120,17 @@ Flight::route ('POST /login', function () {
  * Además, opcionalmente, tendrá que devolver solo un contacto obtenido a partir de su ID,
  * teniendo en cuenta que debe pertenecer al usuario autenticado.
  */
-Flight::route('GET /contactos(/@id_contacto)', function ($id_contacto = null) {
+Flight::route('GET /contactos(/@contacto_id)', function ($contacto_id = null) {
     try {
         // 1. Middleware: Validar token y obtener usuario autenticado
         validarToken();
         $usuario_id = Flight::get('usuario')['id'];
 
         // 2. Construir una consulta SQL dinámica según si se quiere un contacto o todos
-        if ($id_contacto !== null){
+        if ($contacto_id !== null){
             $sql = "SELECT * FROM contactos WHERE id = :id LIMIT 1";
             $stmt = Flight::db()->prepare($sql);
-            $stmt->bindParam(':id', $id_contacto, PDO::PARAM_INT);
+            $stmt->bindParam(':id', $contacto_id, PDO::PARAM_INT);
 
         } else {
             $sql = "SELECT * FROM contactos WHERE usuario_id = :usuario_id";
@@ -140,7 +140,7 @@ Flight::route('GET /contactos(/@id_contacto)', function ($id_contacto = null) {
 
         // 3. Ejecutar consulta
         $stmt->execute();
-        $contactos = $id_contacto !== null
+        $contactos = $contacto_id !== null
             ? $stmt->fetch(PDO::FETCH_ASSOC)
             : $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -214,13 +214,86 @@ Flight::route ('POST /contactos', function(){
 /**
  * Editar contacto (/contactos): permite modificar un contacto, asegurando que sea del usuario autenticado.
  */
-Flight::route('PUT /contactos', function(){
+Flight::route('PUT /contactos/@contacto_id', function($contacto_id){
     try {
+        // 1. Validar usuario autenticado y recoger sus datos
+        validarToken();
+        $usuario = Flight::get('usuario');
 
+        // 2. Validar datos para la modicación del contacto
+        validarContactoModificar();
+        $nuevosDatos = Flight::get('contacto');
+
+        // 3. Recoger los datos originales del contacto
+        $sql = "SELECT * FROM contactos WHERE id = :id";
+        $stmt = Flight::db()->prepare($sql);
+        $stmt->execute([
+            ':id' => $contacto_id
+        ]);
+        $contactoOriginal = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // 4. Mensaje de error en caso de que el contacto no exista. Status Code 404 Not Found
+        if (empty($contactoOriginal)) {
+            Flight::jsonHalt([
+                'success' => false,
+                'error' => 'Contacto no encontrado.'
+            ], 404);
+        }
+
+        // 5. Mensaje de error en caso de que el contacto a modificar no pertenezca al usuario autenticado. Statud Code 403 Forbiden
+        if ($usuario['id'] != $contactoOriginal['usuario_id']) {
+            Flight::halt(403, json_encode([
+                'success' => false,
+                'error' => 'El usuario no tiene permiso para modificar este contacto.'
+            ]));
+        }
+
+        /**
+         *  6. Preparar actualización selectiva
+         *  - NOTA: Debería convertir este bloque de código en un middleware??
+         */ 
+        // Campos que es posible actualizar
+        $camposPermitidos = [
+            'nombre',
+            'telefono',
+            'email'
+        ];
+
+        // Campos que se van a actualizar
+        $camposUpdateSQL = [];
+
+        // Valores para los campos que se van a actualizar. Este array se pasará como argumento de la función execute().
+        $valores = [':id' => $contacto_id];
+
+        foreach ($camposPermitidos as $campo) {
+            if (!empty($nuevosDatos[$campo])) {
+                $valor = $nuevosDatos[$campo];
+                $placeholder = ":$campo";
+                $camposUpdateSQL[] = "$campo = $placeholder";
+                $valores[$placeholder] = $valor;
+            }
+        }
+
+        // Comprobar que hay cambios, si no los hay, enviar un mensaje
+        if (empty($camposUpdateSQL)){
+            Flight::json([
+                'success' => true,
+                'message' => 'No hubo cambios en la tabla "clientes"'
+            ]);
+        }
+
+        $sql = "UPDATE contactos SET " . implode(",", $camposUpdateSQL) . " WHERE id=:id";
+        $stmt = Flight::db()->prepare($sql);
+        $stmt->execute($valores);
+
+        Flight::json([
+            'success' => true
+        ], 200);
     } catch (PDOException $e) {
         Flight::json([
             'success' => false,
             'error' => $e->getMessage()], 500); // Status code 500 "Internal Server Error".
     }
 });
+
 Flight::start();
