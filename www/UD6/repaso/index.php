@@ -296,4 +296,49 @@ Flight::route('PUT /contactos/@contacto_id', function($contacto_id){
     }
 });
 
+Flight::route('DELETE /contactos/@contacto_id', function($contacto_id){
+    try{
+        // 1. Validar token de usuario autenticado
+        validarToken();
+        $usuario = Flight::get('usuario');
+
+        // 2. Comprobar que el contacto existe en la BD
+        $sql = "SELECT * FROM contactos WHERE id=:id LIMIT 1";
+        $stmt = Flight::db()->prepare($sql);
+        $stmt->execute([":id" => $contacto_id]);
+        $contacto = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // 2.1. Si el contacto no existe. Status Code 404 Not Found.
+        if(empty($contacto)){
+            Flight::jsonHalt([
+                'success' => false,
+                'error' => "El contacto no existe en la base en la base de datos."
+            ], 404);
+        }
+
+        // 2.2. Si el contacto existe pero no pertenece al usuario. Status Code 403 Forbiden.
+        if($usuario['id'] != $contacto['usuario_id']){
+            Flight::jsonHalt([
+                'success' => false,
+                'error' => 'El usuario no tiene permiso para borrar este contacto.'
+            ], 403);
+        }
+
+        // 3. Si el contacto existe en la base de datos, eliminarlo
+        $sql = "DELETE FROM contactos WHERE id=:id";
+        $stmt = Flight::db()->prepare($sql);
+        $stmt->execute([":id" => $contacto_id]);
+
+        Flight::json([
+            'success' => true,
+            'message' => 'El contacto se eliminó correctamente.'
+        ]);
+    } catch (PDOException $e) {
+        Flight::jsonHalt([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
+
 Flight::start();
