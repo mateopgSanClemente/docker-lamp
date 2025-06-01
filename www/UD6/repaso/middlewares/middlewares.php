@@ -169,3 +169,29 @@ function validarContacto() {
         'email' => $email
     ]);
 }
+
+/**
+ * Función para validar datos para la modificación de contacto.
+ */
+function validarContactoModificar(){
+    // 1. Recojo los datos de la petición HTTP y los saneo
+    $data = Flight::request()->data;
+    $nombre = trim($data->nombre ?? '');
+    $telefono = trim($data->telefono ?? '');
+    $email = trim($data->email ?? '');
+
+    // 2. Todos los campos son opcionales, solo valido email
+    if(!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)){
+        Flight::halt(400, json_encode([
+            'success' => false,
+            'error' => 'El email no tiene el formato correcto.'
+        ]));
+    }
+
+    // 3. Guardar datos en Flight
+    Flight::set('contacto', [
+        'nombre' => $nombre,
+        'telefono' => $telefono,
+        'email' => $email
+    ]);
+}
